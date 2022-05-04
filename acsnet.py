@@ -17,10 +17,12 @@ import requests
 import pytest
 
 CALLSIGN_REX = re.compile(r"([A-Z]{1,3}[0-9][A-Z]{1,3})")
-QRZ_ENDPOINT_AUTH = 'https://xmldata.qrz.com/xml/current/?username={username};password={password};agent=kf7hvm-lookup'
-QRZ_ENDPOINT_LOOKUP = "https://xmldata.qrz.com/xml/current/?s={key};callsign={callsign};t={epoch_ms}"
-QRZ_SESSION_TAG = '{http://xmldata.qrz.com}Session'
-QRZ_KEY_TAG = '{http://xmldata.qrz.com}Key'
+QRZ_ENDPOINT_AUTH = "https://xmldata.qrz.com/xml/current/?username={username};password={password};agent=kf7hvm-lookup"
+QRZ_ENDPOINT_LOOKUP = (
+    "https://xmldata.qrz.com/xml/current/?s={key};callsign={callsign};t={epoch_ms}"
+)
+QRZ_SESSION_TAG = "{http://xmldata.qrz.com}Session"
+QRZ_KEY_TAG = "{http://xmldata.qrz.com}Key"
 
 
 logging.basicConfig(level=logging.INFO)
@@ -59,10 +61,7 @@ class QRZ:
         )
         lresp.raise_for_status()
         root = ET.fromstring(lresp.content)
-        return {
-            node.tag.partition("}")[2]: node.text
-            for node in root[0]
-        }
+        return {node.tag.partition("}")[2]: node.text for node in root[0]}
 
 
 @dataclass
@@ -109,7 +108,8 @@ class NetDB:
 
     def users(self):
         c = self.dbi.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT call, name, city
             FROM users
             ORDER BY city ASC, call ASC"""
@@ -150,7 +150,7 @@ class NetDB:
                ON CONFLICT(call) DO UPDATE SET
                    name=excluded.name,
                    city=excluded.city;""".format(
-                   ",".join(["(UPPER(?), ?, ?)"] * len(users)),
+                ",".join(["(UPPER(?), ?, ?)"] * len(users)),
             ),
             params,
         )
@@ -190,7 +190,7 @@ class NetDB:
             """INSERT INTO checkins (call, date, file)
                VALUES {}
                ON CONFLICT DO NOTHING""".format(
-                   ",".join(["(UPPER(?), ?, ?)"] * len(callsigns)),
+                ",".join(["(UPPER(?), ?, ?)"] * len(callsigns)),
             ),
             params,
         )
@@ -229,7 +229,8 @@ class NetDB:
             """SELECT date, COUNT(call)
                FROM checkins
                GROUP BY date
-               ORDER BY date DESC""")
+               ORDER BY date DESC"""
+        )
         return c.fetchall()
 
     def cities_calls_ncheckins(self):
@@ -239,7 +240,8 @@ class NetDB:
                FROM checkins
                LEFT JOIN users ON checkins.call = users.call
                GROUP BY checkins.call
-               ORDER BY city ASC, n_checkins DESC, last DESC, checkins.call ASC""")
+               ORDER BY city ASC, n_checkins DESC, last DESC, checkins.call ASC"""
+        )
         return c.fetchall()
 
 
@@ -289,10 +291,7 @@ class TestAcsNet:
                 ("kd7uqr", "kie", "silver lake"),
             )
         ]
-        users_upper = [
-            User(u.call.upper(), u.name, u.city)
-            for u in users
-        ]
+        users_upper = [User(u.call.upper(), u.name, u.city) for u in users]
         ndb.import_users(users)
         assert users != list(ndb.users())
         # importing the user automatically uppers the callsign
@@ -316,8 +315,9 @@ class TestAcsNet:
         ndb.import_directory(net_dir)
         assert ndb.nets() == [("2022-05-16", 2), ("2022-05-09", 3), ("2022-05-02", 2)]
         from pdb import set_trace
+
         set_trace()
-        
+
 
 if __name__ == "__main__":
     script_dir = Path(__file__).parent.resolve()
@@ -328,12 +328,12 @@ if __name__ == "__main__":
     ndb.import_directory(script_dir / "logs")
     fmt = "{:<16} {:<7} {:<20} {:<6} {}"
     print(fmt.format("CITY", "CALL", "NAME", "TOTAL", "LAST"))
-    with (script_dir / 'user_stats.csv').open('w', newline='') as csvfile:
+    with (script_dir / "user_stats.csv").open("w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         for row in ndb.cities_calls_ncheckins():
             print(fmt.format(*(str(c) for c in row)))
             writer.writerow(row)
-    with (script_dir / 'users.csv').open('w', newline='') as csvfile:
+    with (script_dir / "users.csv").open("w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         for u in ndb.users():
             writer.writerow(astuple(u))
